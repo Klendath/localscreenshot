@@ -1,0 +1,104 @@
+#----------------------------------------------------------------------
+#   Local Screenshot
+#   - Places another button on the toolbar to take a screenshot of the 
+#     CS Client. Saves them to a folder named "screenshots" in the same 
+#     location as where this script is loaded from.
+#   !!! The button ICON is the same as the original Screenshots Icon !!!
+#   
+#   12/1/2021 - Added a dialog to log notes about the screenshots. 
+#                   
+#----------------------------------------------------------------------
+
+# Required Java libraries
+import java.awt.image.BufferedImage;
+import java.io.File;
+import javax.imageio.ImageIO;
+
+this('$init');
+
+$init = 0;
+
+sub __init_local_screenshot__
+{
+    if($init == 0)
+    {
+        try
+        {
+            $tool = [getAggressorClient() tool];
+
+            foreach $component ([$tool getComponents])
+            {
+                if([$component getToolTipText] eq "Local Screenshot")
+                {
+                    [$tool remove: $component]
+                }
+
+            }
+
+            toolbar(image_internal("resources/cc/black/png/picture_icon&16.png"), "Local Screenshot", { local_screenshot(); });
+            [$tool updateUI];
+            [$tool repaint];
+            $init = 1;
+        }
+        catch $ex
+        {
+            show_message("SCREENSHOT INIT ERROR: " . $ex);
+        }
+    }
+   
+}
+
+sub log_screenshot
+{
+    try
+    {
+        $data = "[" . $3['filename'] . "]:[" . $3['note'] . "]\n";
+        $handle = openf(">>" . $3['dirname'] . "/" . mynick() . "_screenshot_notes.txt");
+        writeb($handle, $data);
+        closef($handle);
+    }
+    catch $ex
+    {
+        println("[Local Screenshot Error]: " . $ex);
+    }
+
+}
+
+sub local_screenshot {
+    try 
+    {
+        $format = "png";
+        $shortName = formatDate("yyyy-MM-dd_HHmmss_") . mynick() . "_screenshot"; 
+        $dirname =  script_resource("/screenshots");
+        $filename = $dirname . "/" .  $shortName . "." . $format;
+        $file = [new File :$filename];
+        $filename = [$file getAbsoluteFile];
+        $dirname = [$file getParent];
+        mkdir($dirname);
+        if (-isDir $dirname)
+        {
+            $window = [getAggressorClient() window];
+            $image = [new BufferedImage: [$window getWidth], [$window getHeight], [BufferedImage TYPE_INT_RGB]];
+            [$window paint: [$image getGraphics]];
+            [ImageIO write: $image, $format, [new File: $filename]];
+
+
+            $dialog = dialog("Add Screenshot Note", %(note => "Add Note", filename => $filename, dirname => $dirname), &log_screenshot);
+            drow_text_big($dialog, "note", "Screenshot Note: ");
+            dbutton_action($dialog, "Add Note");
+            dialog_show($dialog);
+
+            show_message("SCREESHOT SAVED TO: " . $filename);
+        }
+        else
+        {
+            throw "Unable to make the directory " . $dirname;
+        }
+    } 
+    catch $ex
+    {
+        println("[Local Screenshot Error]: " . $ex);   
+    }
+}
+
+__init_local_screenshot__(\$this);
